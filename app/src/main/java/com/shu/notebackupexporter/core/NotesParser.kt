@@ -91,8 +91,13 @@ object NotesParser {
                 f == 9 && w == 2 -> {
                     val sub = r.readLengthDelimited()
                     if (text.isEmpty()) {
-                        forEachField(sub) { f2, w2, r2 ->
-                            if (f2 == 4 && w2 == 2) text = r2.readString() else r2.skip(w2)
+                        
+                        
+                        
+                        runCatching {
+                            forEachField(sub) { f2, w2, r2 ->
+                                if (f2 == 4 && w2 == 2) text = r2.readString() else r2.skip(w2)
+                            }
                         }
                         
                         if (text.isEmpty()) {

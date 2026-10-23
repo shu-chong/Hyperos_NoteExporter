@@ -20,8 +20,8 @@ android {
         applicationId = "com.shu.notebackupexporter"
         minSdk = 33
         targetSdk = 37
-        versionCode = 11
-        versionName = "3.0"
+        versionCode = 12
+        versionName = "3.1"
         androidResources.localeFilters += arrayOf("zh", "en")
     }
 

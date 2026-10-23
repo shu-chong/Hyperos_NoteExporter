@@ -13,6 +13,12 @@
    - 导出格式在设置里切换（Word / PDF / Markdown）
    - Markdown 仅承载纯文本；含图片的笔记自动按设置的 Word / PDF 导出
 
+## 系统要求
+
+- Android 15 及以上
+- HyperOS 3.0.3xx 及以上版本
+- 备份 App（com.miui.backup）7.0.0.x-OS3 及以上
+
 ## 构建
 
 ```bash

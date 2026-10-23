@@ -1023,6 +1023,21 @@ private fun AppScreen(resumeTick: Int) {
                 Spacer(Modifier.height(20.dp))
                 
                 Text(
+                    text = "系统要求",
+                    style = MiuixTheme.textStyles.body1,
+                    fontWeight = FontWeight.Bold,
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "最低支持 Android 15、HyperOS 3.0.3xx 版本；" +
+                           "备份 App 要求 7.0.0.x-OS3 以上。",
+                    style = MiuixTheme.textStyles.body1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(Modifier.height(20.dp))
+                
+                Text(
                     text = "隐私说明",
                     style = MiuixTheme.textStyles.body1,
                     fontWeight = FontWeight.Bold,
