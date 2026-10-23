@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// 签名配置从 keystore.properties 读取，避免把口令写死在构建脚本里
+
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -20,8 +20,8 @@ android {
         applicationId = "com.shu.notebackupexporter"
         minSdk = 33
         targetSdk = 37
-        versionCode = 10
-        versionName = "2.0"
+        versionCode = 11
+        versionName = "3.0"
         androidResources.localeFilters += arrayOf("zh", "en")
     }
 

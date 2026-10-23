@@ -1,4 +1,5 @@
 package com.shu.notebackupexporter
+
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
@@ -61,6 +62,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -89,29 +91,46 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+
 private const val OUTPUT_DIR_NAME = "小米笔记"
+private const val GITHUB_URL = "https://github.com/shu-chong/Hyperos_NoteExporter"
+
 private const val DEVELOPER = "爱看小说的书虫"
+
+
 private const val HUGE_BACKUP_BYTES = 300L * 1024 * 1024
+
+
 private fun isZipFile(f: File): Boolean = runCatching {
     val head = ByteArray(4)
     val n = f.inputStream().use { it.read(head) }
     n == 4 && head[0] == 0x50.toByte() && head[1] == 0x4B.toByte() &&
         head[2] == 0x03.toByte() && head[3] == 0x04.toByte()
 }.getOrDefault(false)
+
+
 private const val BACKUP_DIR_PATH = "MIUI/backup/AllBackup"
+
+
 private fun backupDirInitialUri(): Uri? = runCatching {
     DocumentsContract.buildDocumentUri(
         "com.android.externalstorage.documents",
         "primary:$BACKUP_DIR_PATH"
     )
 }.getOrNull()
+
+
 private val AccentBlue = Color(0xFF2A6BFF)
 private val AccentBlueLight = Color(0xFF4C8DFF)
 private val PillBg = Color(0xFFE4EEFF)
 private val GreyText = Color(0xFFB5B5B5)
 private val GreyBg = Color(0xFFF0F0F0)
+
 class MainActivity : ComponentActivity() {
+
     private val resumeTick = mutableStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -121,14 +140,19 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
     override fun onResume() {
         super.onResume()
         resumeTick.value++
     }
 }
+
 private fun hasAllFilesAccess(): Boolean =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager() else true
+
 private enum class Phase { IDLE, DECRYPTING, DECRYPTED, EXPORTING, EXPORTED, FAILED }
+
+
 @Composable
 private fun SectionTitle(text: String) {
     Text(
@@ -140,6 +164,8 @@ private fun SectionTitle(text: String) {
             .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 10.dp)
     )
 }
+
+
 @Composable
 private fun AppCard(
     modifier: Modifier = Modifier,
@@ -151,6 +177,8 @@ private fun AppCard(
         }
     }
 }
+
+
 @Composable
 private fun PillButton(
     text: String,
@@ -176,6 +204,8 @@ private fun PillButton(
         modifier = modifier
     ) { Text(text) }
 }
+
+
 @Composable
 private fun AppIcon(size: Dp) {
     Box(
@@ -197,23 +227,27 @@ private fun AppIcon(size: Dp) {
         )
     }
 }
+
 @Composable
 private fun DialogRow(
     title: String,
     value: String? = null,
     onClick: (() -> Unit)? = null,
+    titleStyle: TextStyle = MiuixTheme.textStyles.body1,
+    indent: Dp = 0.dp,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(horizontal = 8.dp, vertical = 12.dp),
+            .padding(start = 8.dp + indent, end = 8.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             title,
             modifier = Modifier.weight(1f),
+            style = titleStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -223,6 +257,8 @@ private fun DialogRow(
         }
     }
 }
+
+
 private fun openOutputFolder(ctx: Context): Boolean {
     val docUri = DocumentsContract.buildDocumentUri(
         "com.android.externalstorage.documents",
@@ -232,9 +268,11 @@ private fun openOutputFolder(ctx: Context): Boolean {
         setDataAndType(docUri, DocumentsContract.Document.MIME_TYPE_DIR)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
+
     val handlers = runCatching {
         ctx.packageManager.queryIntentActivities(view, PackageManager.MATCH_DEFAULT_ONLY)
     }.getOrDefault(emptyList())
+
     if (handlers.size > 1 &&
         runCatching { ctx.startActivity(Intent.createChooser(view, "选择文件管理器")) }.isSuccess
     ) {
@@ -244,6 +282,7 @@ private fun openOutputFolder(ctx: Context): Boolean {
     if (runCatching { ctx.startActivity(Intent.createChooser(view, "选择文件管理器")) }.isSuccess) {
         return true
     }
+
     val fallbacks = listOf(
         ComponentName(
             "com.mi.android.globalFileexplorer",
@@ -261,22 +300,28 @@ private fun openOutputFolder(ctx: Context): Boolean {
     }
     return false
 }
+
 @Composable
 private fun AppScreen(resumeTick: Int) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val main = remember { Handler(Looper.getMainLooper()) }
+
     var granted by remember { mutableStateOf(hasAllFilesAccess()) }
     var showPermission by remember { mutableStateOf(!hasAllFilesAccess()) }
     var backups by remember { mutableStateOf<List<BackupLocator.BackupFile>>(emptyList()) }
     var scanning by remember { mutableStateOf(false) }
     var pickedFile by remember { mutableStateOf<File?>(null) }
+    
     var pickedName by remember { mutableStateOf<String?>(null) }
     var pickedIsZip by remember { mutableStateOf(true) }
+
     var format by remember { mutableStateOf(Prefs.format(ctx)) }
+    var fallbackFormat by remember { mutableStateOf(Prefs.fallbackFormat(ctx)) }
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showPickDialog by remember { mutableStateOf(false) }
+
     var prepared by remember { mutableStateOf<Exporter.Prepared?>(null) }
     var checked by remember { mutableStateOf<Set<Int>>(emptySet()) }
     var phase by remember { mutableStateOf(Phase.IDLE) }
@@ -284,9 +329,11 @@ private fun AppScreen(resumeTick: Int) {
     var exportProgress by remember { mutableStateOf<Exporter.Progress?>(null) }
     var exportResult by remember { mutableStateOf<Exporter.Result?>(null) }
     var failMessage by remember { mutableStateOf<String?>(null) }
+
     val versionName = remember {
         runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() ?: "—"
     }
+
     LaunchedEffect(resumeTick, granted) {
         granted = hasAllFilesAccess()
         if (granted) {
@@ -296,9 +343,12 @@ private fun AppScreen(resumeTick: Int) {
             scanning = false
         }
     }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { granted = hasAllFilesAccess() }
+
+    
     fun usePickedFile(file: File, displayName: String, isZip: Boolean) {
         pickedFile = file
         pickedName = displayName
@@ -312,6 +362,8 @@ private fun AppScreen(resumeTick: Int) {
         failMessage = null
         phase = Phase.IDLE
     }
+
+    
     val pickLauncher = rememberLauncherForActivityResult(
         object : ActivityResultContract<Uri?, Uri?>() {
             override fun createIntent(context: Context, input: Uri?): Intent =
@@ -320,6 +372,7 @@ private fun AppScreen(resumeTick: Int) {
                     type = "*/*"
                     if (input != null) putExtra(DocumentsContract.EXTRA_INITIAL_URI, input)
                 }
+
             override fun parseResult(resultCode: Int, intent: Intent?): Uri? =
                 if (resultCode == Activity.RESULT_OK) intent?.data else null
         }
@@ -328,6 +381,7 @@ private fun AppScreen(resumeTick: Int) {
             scope.launch {
                 val picked = withContext(Dispatchers.IO) {
                     runCatching {
+                        
                         var displayName: String? = null
                         var lastMod = 0L
                         runCatching {
@@ -365,9 +419,11 @@ private fun AppScreen(resumeTick: Int) {
             }
         }
     }
+
     fun currentTarget(): BackupLocator.BackupFile? =
         pickedFile?.let { BackupLocator.BackupFile(it, pickedIsZip, pickedName) }
             ?: backups.firstOrNull()
+
     fun requestPermission() {
         val intent = Intent(
             Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
@@ -376,6 +432,7 @@ private fun AppScreen(resumeTick: Int) {
         runCatching { permissionLauncher.launch(intent) }
             .onFailure { permissionLauncher.launch(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
     }
+
     fun openBackupApp() {
         val intent = Intent().apply {
             component = ComponentName("com.miui.backup", "com.miui.backup.local.LocalHomeActivity")
@@ -384,6 +441,7 @@ private fun AppScreen(resumeTick: Int) {
         runCatching { ctx.startActivity(intent) }
             .onFailure { toast(ctx, "没有找到备份应用，请到「设置 → 更多设置 → 备份与恢复」") }
     }
+
     fun startDecrypt() {
         val target = currentTarget()
         if (target == null) {
@@ -398,6 +456,7 @@ private fun AppScreen(resumeTick: Int) {
         failMessage = null
         decryptProgress = Exporter.Progress("准备中…", 0, 0)
         phase = Phase.DECRYPTING
+
         scope.launch {
             val outcome = withContext(Dispatchers.IO) {
                 runCatching {
@@ -408,17 +467,18 @@ private fun AppScreen(resumeTick: Int) {
                 onSuccess = { prep ->
                     prepared = prep
                     checked = emptySet()
-                    decryptProgress = Exporter.Progress("解密完成", prep.size, prep.size)
+                    decryptProgress = Exporter.Progress("解析完成", prep.size, prep.size)
                     phase = Phase.DECRYPTED
                 },
                 onFailure = { e ->
-                    decryptProgress = decryptProgress?.copy(message = "解密失败")
+                    decryptProgress = decryptProgress?.copy(message = "解析失败")
                     failMessage = e.message ?: e.toString()
                     phase = Phase.FAILED
                 }
             )
         }
     }
+
     fun startExport(indices: List<Int>) {
         val prep = prepared ?: return
         if (indices.isEmpty()) {
@@ -430,11 +490,12 @@ private fun AppScreen(resumeTick: Int) {
         failMessage = null
         exportProgress = Exporter.Progress("准备中…", 0, 0)
         phase = Phase.EXPORTING
+
         scope.launch {
             val outcome = withContext(Dispatchers.IO) {
                 runCatching {
                     Exporter(ctx.applicationContext).export(
-                        prep, indices, outRoot, format
+                        prep, indices, outRoot, format, Prefs.fallbackFormat(ctx)
                     ) { p -> main.post { exportProgress = p } }
                 }
             }
@@ -452,19 +513,25 @@ private fun AppScreen(resumeTick: Int) {
             )
         }
     }
+
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val sidePad = if (screenWidthDp > 800) ((screenWidthDp - 760) / 2).dp else 16.dp
     val busy = phase == Phase.DECRYPTING || phase == Phase.EXPORTING
     val selection = checked
     val gated = !granted
+    
     val formatTag = when (format) {
         ExportFormat.WORD -> "Word"
         ExportFormat.PDF -> "PDF"
+        ExportFormat.MARKDOWN -> "Markdown"
     }
+
     val listState = rememberLazyListState()
     val scrollBehavior = MiuixScrollBehavior(
         canScroll = { listState.canScrollBackward || listState.canScrollForward }
     )
+    
+    
     val progressAnchor = 2
     LaunchedEffect(phase) {
         if (phase == Phase.EXPORTING || phase == Phase.EXPORTED || phase == Phase.FAILED) {
@@ -474,6 +541,7 @@ private fun AppScreen(resumeTick: Int) {
             }
         }
     }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -512,11 +580,14 @@ private fun AppScreen(resumeTick: Int) {
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
                 contentPadding = PaddingValues(horizontal = sidePad, vertical = 4.dp)
             ) {
+                
                 item {
                     SectionTitle("备份与选择")
                     AppCard {
                         val target = currentTarget()
                         if (target != null) {
+                            
+                            
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = "已选择",
@@ -545,7 +616,7 @@ private fun AppScreen(resumeTick: Int) {
                             }
                             if (target.size > HUGE_BACKUP_BYTES) {
                                 Spacer(Modifier.height(6.dp))
-                                Text("这个备份体积较大，可能是整机备份；解密只会读取其中的笔记数据。")
+                                Text("这个备份体积较大，可能是整机备份；解析只会读取其中的笔记数据。")
                             }
                         } else if (scanning) {
                             Text("正在扫描备份目录…")
@@ -557,6 +628,8 @@ private fun AppScreen(resumeTick: Int) {
                         Spacer(Modifier.height(10.dp))
                         Text("在系统设置的「本地备份」里只勾选「笔记」后开始备份，完成后回到本应用会自动识别；也可以手动选择备份文件。")
                         Spacer(Modifier.height(12.dp))
+                        
+                        
                         PillButton(
                             text = "打开备份界面",
                             enabled = !busy,
@@ -590,21 +663,29 @@ private fun AppScreen(resumeTick: Int) {
                         }
                     }
                 }
+
+                
                 item {
-                    SectionTitle("解密笔记")
+                    SectionTitle("解析笔记")
                     AppCard {
                         val prep = prepared
                         if (prep == null) {
-                            Text("解密后可以查看全部笔记标题，并逐条或批量导出。")
+                            Text("解析后可以查看全部笔记标题，并逐条或批量导出。")
                         } else {
-                            Text("已解密 ${prep.size} 条笔记")
+                            Text("已解析 ${prep.size} 条笔记")
                             if (prep.mergedDuplicates > 0) {
                                 Spacer(Modifier.height(4.dp))
                                 Text("已合并 ${prep.mergedDuplicates} 条完全重复的记录")
                             }
                             Spacer(Modifier.height(4.dp))
-                            Text("图片附件 ${prep.attachmentCount} 张")
+                            Text(
+                                buildString {
+                                    append("图片附件 ${prep.imageCount} 张")
+                                    if (prep.audioCount > 0) append("　·　语音 ${prep.audioCount} 条")
+                                }
+                            )
                         }
+
                         Spacer(Modifier.height(12.dp))
                         Button(
                             onClick = { if (gated) showPermission = true else startDecrypt() },
@@ -614,14 +695,16 @@ private fun AppScreen(resumeTick: Int) {
                         ) {
                             Text(
                                 when {
-                                    phase == Phase.DECRYPTING -> "正在解密…"
-                                    prep == null -> "开始解密"
-                                    else -> "重新解密"
+                                    phase == Phase.DECRYPTING -> "正在解析…"
+                                    prep == null -> "开始解析"
+                                    else -> "重新解析"
                                 }
                             )
                         }
                     }
                 }
+
+                
                 val activeProgress = when (phase) {
                     Phase.DECRYPTING -> decryptProgress
                     Phase.EXPORTING -> exportProgress
@@ -659,9 +742,21 @@ private fun AppScreen(resumeTick: Int) {
                                     )
                                 }
                                 result != null -> {
-                                    Text("已导出 ${result.exportedCount} 条　·　图片 ${result.imageCount} 张")
+                                    Text(
+                                        buildString {
+                                            append("已导出 ${result.exportedCount} 条　·　图片 ${result.imageCount} 张")
+                                            if (result.audioCount > 0) append("　·　语音 ${result.audioCount} 条")
+                                        }
+                                    )
                                     Spacer(Modifier.height(4.dp))
-                                    Text("格式：${result.format.label}")
+                                    Text(
+                                        buildString {
+                                            append("格式：${result.format.label}")
+                                            if (result.fallbackCount > 0) {
+                                                append("　·　${result.fallbackCount} 条含图片，按 ${result.fallbackFormat?.label ?: "Word"} 导出")
+                                            }
+                                        }
+                                    )
                                     if (result.combinedFile != null) {
                                         Spacer(Modifier.height(4.dp))
                                         Text("汇总文档：${result.combinedFile.name}")
@@ -670,8 +765,12 @@ private fun AppScreen(resumeTick: Int) {
                                         Spacer(Modifier.height(4.dp))
                                         Text("单条文档：单条笔记/ 共 ${result.perNoteCount} 个文件")
                                     }
+                                    if (result.audioCount > 0) {
+                                        Spacer(Modifier.height(4.dp))
+                                        Text("语音：汇总在 语音附件/，单条与文档同目录")
+                                    }
                                     Spacer(Modifier.height(4.dp))
-                                    Text("位置：Download/$OUTPUT_DIR_NAME")
+                                    Text("位置：Download/$OUTPUT_DIR_NAME/${result.outputRoot.name}")
                                     Spacer(Modifier.height(12.dp))
                                     Button(
                                         onClick = {
@@ -687,6 +786,8 @@ private fun AppScreen(resumeTick: Int) {
                         }
                     }
                 }
+
+                
                 prepared?.let { prep ->
                     item {
                         SectionTitle("笔记列表（${prep.size} 条）")
@@ -739,8 +840,11 @@ private fun AppScreen(resumeTick: Int) {
                         }
                     }
                 }
+
                 item { Spacer(Modifier.height(16.dp)) }
             }
+
+            
             if (prepared != null) {
                 Column(
                     modifier = Modifier
@@ -767,6 +871,10 @@ private fun AppScreen(resumeTick: Int) {
                 }
             }
         }
+
+        
+
+        
         OverlayDialog(
             show = showPickDialog,
             title = "选择备份文件",
@@ -804,6 +912,7 @@ private fun AppScreen(resumeTick: Int) {
                 ) { Text("取消") }
             }
         }
+
         OverlayDialog(
             show = showPermission,
             title = "需要文件访问权限",
@@ -823,6 +932,7 @@ private fun AppScreen(resumeTick: Int) {
                 ) { Text("去授权") }
             }
         }
+
         OverlayDialog(
             show = showSettings,
             title = "设置",
@@ -844,12 +954,37 @@ private fun AppScreen(resumeTick: Int) {
                     }
                 )
             }
+            
+            if (format == ExportFormat.MARKDOWN) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Markdown 仅支持纯文本笔记；含图片的笔记将按下方格式导出，" +
+                           "语音单独存为 .m4a 放在同目录。",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
+                )
+                listOf(ExportFormat.WORD, ExportFormat.PDF).forEach { f ->
+                    DialogRow(
+                        title = "含图片笔记导出为 ${f.label}",
+                        value = if (f == fallbackFormat) "✓" else null,
+                        onClick = {
+                            fallbackFormat = f
+                            Prefs.setFallbackFormat(ctx, f)
+                        },
+                        
+                        titleStyle = MiuixTheme.textStyles.footnote1,
+                        indent = 20.dp,
+                    )
+                }
+            }
             Spacer(Modifier.height(12.dp))
             DialogRow(title = "关于", value = "›", onClick = {
                 showSettings = false
                 showAbout = true
             })
         }
+
         OverlayDialog(
             show = showAbout,
             title = "关于",
@@ -859,6 +994,7 @@ private fun AppScreen(resumeTick: Int) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.Start
             ) {
+                
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     AppIcon(56.dp)
                     Spacer(Modifier.width(16.dp))
@@ -877,13 +1013,15 @@ private fun AppScreen(resumeTick: Int) {
                     }
                 }
                 Spacer(Modifier.height(20.dp))
+                
                 Text(
-                    text = "把小米笔记的本地备份解密后，导出成 Word 或 PDF，" +
+                    text = "把小米笔记的本地备份解析后，导出成 Word、PDF 或 Markdown，" +
                            "保存到 Download/$OUTPUT_DIR_NAME。",
                     style = MiuixTheme.textStyles.body1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Spacer(Modifier.height(20.dp))
+                
                 Text(
                     text = "隐私说明",
                     style = MiuixTheme.textStyles.body1,
@@ -899,22 +1037,46 @@ private fun AppScreen(resumeTick: Int) {
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = "文件解密、文档导出等全部处理流程均在本机完成。" +
+                    text = "文件解析、文档导出等全部处理流程均在本机完成。" +
                             "应用不会主动复制、外传您的备份文件；" +
                             "导出的文档，仅写入当前设备的指定位置。",
                     style = MiuixTheme.textStyles.body1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Spacer(Modifier.height(24.dp))
+                
                 Text(
                     text = "开发者：$DEVELOPER",
                     style = MiuixTheme.textStyles.body1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
+                Spacer(Modifier.height(4.dp))
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "源代码：",
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                    Text(
+                        text = "Github",
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier.clickable {
+                            runCatching {
+                                ctx.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL))
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                )
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
+
 @Composable
 private fun NoteRow(
     index: Int,
@@ -954,9 +1116,11 @@ private fun NoteRow(
         PillButton(text = "导出", enabled = enabled, minWidth = 76.dp, onClick = onExport)
     }
 }
+
 private fun fmtDate(ms: Long): String =
     if (ms <= 0) "—"
     else SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.CHINA).format(Date(ms))
+
 private fun toast(ctx: Context, msg: String) {
     Handler(Looper.getMainLooper()).post {
         Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()

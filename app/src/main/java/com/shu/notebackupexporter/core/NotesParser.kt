@@ -1,4 +1,6 @@
 package com.shu.notebackupexporter.core
+
+
 data class Note(
     val id: String,
     val created: Long,
@@ -7,11 +9,15 @@ data class Note(
     val text: String,
     val legacy: Boolean = false,
 )
+
+
 object NotesParser {
+
     fun parse(proto: ByteArray): List<Note> {
         parseNewFormat(proto)?.let { if (it.isNotEmpty()) return it }
         return parseLegacyFormat(proto) ?: emptyList()
     }
+
     private fun parseNewFormat(proto: ByteArray): List<Note>? {
         var payload: ByteArray? = null
         runCatching {
@@ -19,6 +25,7 @@ object NotesParser {
                 if (f == 10 && w == 2 && payload == null) payload = r.readLengthDelimited() else r.skip(w)
             }
         }.onFailure { return null }
+
         val body = payload ?: return null
         val notes = ArrayList<Note>()
         forEachField(body) { f, w, r ->
@@ -28,6 +35,7 @@ object NotesParser {
         }
         return notes.filter { it.text.isNotEmpty() || it.created > 0 }
     }
+
     private fun parseNewNote(entry: ByteArray): Note {
         var created = 0L
         var modified = 0L
@@ -47,6 +55,7 @@ object NotesParser {
         val id = uuid.take(8).ifEmpty { created.toString() }
         return Note(id, created, modified, folder, text)
     }
+
     private fun parseLegacyFormat(proto: ByteArray): List<Note>? {
         var container: ByteArray? = null
         runCatching {
@@ -54,6 +63,7 @@ object NotesParser {
                 if (f == 6 && w == 2 && container == null) container = r.readLengthDelimited() else r.skip(w)
             }
         }.onFailure { return null }
+
         val body = container ?: return null
         val notes = ArrayList<Note>()
         forEachField(body) { _, w, r ->
@@ -64,6 +74,7 @@ object NotesParser {
         }
         return notes.ifEmpty { null }
     }
+
     private fun parseLegacyNote(entry: ByteArray): Note? {
         var id = ""
         var created = 0L
@@ -83,6 +94,7 @@ object NotesParser {
                         forEachField(sub) { f2, w2, r2 ->
                             if (f2 == 4 && w2 == 2) text = r2.readString() else r2.skip(w2)
                         }
+                        
                         if (text.isEmpty()) {
                             val s = sub.toString(Charsets.UTF_8)
                             if (s.isNotBlank() && s.none { it.code < 0x20 }) text = s

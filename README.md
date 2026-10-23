@@ -1,15 +1,17 @@
 # 笔记导出 (NoteExporter)
 
-一个 MiuiX 风格的 Android 应用：把小米笔记（`com.miui.notes`）的本地备份解析出来，一键导出成 Word / PDF 文档。
+一个 MiuiX 风格的 Android 应用：把小米笔记（`com.miui.notes`）的本地备份解析出来，一键导出成 Word / PDF / Markdown 文档。
 
 ## 功能
 
 1. 打开应用后引导用户到「本地备份」单独备份笔记
 2. 自动扫描 `MIUI/backup/AllBackup`，识别最新的备份文件（也可手动选择）
-3. 一键导出到 `Download/小米笔记`：
-   - `小米笔记导出.docx` / `小米笔记导出.pdf` — 全部笔记汇总（含目录、创建/修改时间、图片）
-   - `单条笔记/NNN_日期_标题.docx` — 每条笔记一个文件（可开关）
-   - 导出格式在设置里切换（Word / PDF）
+3. 一键导出到 `Download/小米笔记/<日期_时间>/`（每次导出独立目录，互不覆盖）：
+   - `小米笔记导出.docx` / `.pdf` / `.md` — 全部笔记汇总（含目录、创建/修改时间、图片）
+   - `单条笔记/NNN_日期_标题.*` — 每条笔记一个文件（可开关）
+   - `语音附件/` — 语音笔记的录音（.m4a）；单条导出时语音与文档同目录
+   - 导出格式在设置里切换（Word / PDF / Markdown）
+   - Markdown 仅承载纯文本；含图片的笔记自动按设置的 Word / PDF 导出
 
 ## 构建
 
@@ -29,7 +31,8 @@ MIUI/backup/AllBackup/<时间戳>.zip
        ├─ "ANDROID BACKUP\n5\n0\nnone\n"
        └─ tar
             ├─ miui_bak/_tmp_bak     ← 笔记数据（protobuf）
-            ├─ miui_att/<sha1>       ← 图片附件（JPEG）
+            ├─ miui_att/.../attachment/<sha1>        ← 图片附件（JPEG）
+            ├─ miui_att/.../audio_recordings/*.m4a   ← 语音录音
             └─ _manifest / _meta
 ```
 
@@ -41,16 +44,16 @@ MIUI/backup/AllBackup/<时间戳>.zip
 app/src/main/java/com/shu/notebackupexporter/
 ├── MainActivity.kt              界面（MiuiX 组件）
 └── core/
-    ├── ExportFormat.kt          导出格式枚举（Word / PDF）
+    ├── NoteDoc.kt               文档模型接口 + 导出格式枚举
     ├── Proto.kt                 protobuf 最小读取器
     ├── BackupArchive.kt         zip / Android Backup / tar 解析
     ├── NotesParser.kt           protobuf → Note
-    ├── NoteRenderer.kt          Markdown 正文 → 文档
-    ├── NoteDoc.kt               文档模型接口
+    ├── NoteRenderer.kt          正文（Markdown / 图片 / 语音）→ 文档块级渲染
     ├── DocxWriter.kt            OOXML 生成
+    ├── MdWriter.kt              Markdown 生成
     ├── PdfWriter.kt             PDF 生成
     ├── BackupLocator.kt         备份文件定位
-    ├── Prefs.kt                 偏好存储
+    ├── Prefs.kt                 偏好存储（导出格式 / 降级格式）
     └── Exporter.kt              导出流程编排
 ```
 

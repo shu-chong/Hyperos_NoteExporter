@@ -1,4 +1,5 @@
 package com.shu.notebackupexporter.core
+
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.IOException
@@ -6,18 +7,25 @@ import java.io.InputStream
 import java.util.zip.Inflater
 import java.util.zip.InflaterInputStream
 import java.util.zip.ZipFile
+
+
 object BackupArchive {
+
     private val MAGIC = "ANDROID BACKUP".toByteArray(Charsets.US_ASCII)
     private const val BLOCK = 512
+
+    
     fun findNotesEntry(zip: ZipFile): String? =
         zip.entries().asSequence()
             .filter { !it.isDirectory }
             .firstOrNull { it.name.contains("com.miui.notes") && it.name.endsWith(".bak") }
             ?.name
+
+    
     fun openTarStream(input: InputStream): InputStream {
         val ins = BufferedInputStream(input, 1 shl 16)
         skipToMagic(ins, MAGIC)
-        readLine(ins)
+        readLine(ins)                       
         val version = readLine(ins)
         val compressed = readLine(ins)
         val encryption = readLine(ins)
@@ -29,6 +37,7 @@ object BackupArchive {
             ins
         }
     }
+
     private fun skipToMagic(ins: InputStream, magic: ByteArray) {
         var matched = 0
         while (true) {
@@ -42,6 +51,7 @@ object BackupArchive {
             }
         }
     }
+
     private fun readLine(ins: InputStream): String {
         val sb = StringBuilder(16)
         while (true) {
@@ -51,20 +61,27 @@ object BackupArchive {
         }
         return sb.toString()
     }
+
+    
     class Entry(val name: String, val size: Long, val pad: Int)
+
+    
     class TarReader(private val ins: InputStream) {
         private var pendingLongName: String? = null
+
         fun next(): Entry? {
             while (true) {
                 val header = readFully(ins, BLOCK) ?: return null
                 if (header.size < BLOCK) return null
                 if (header.all { it == 0.toByte() }) return null
+
                 val name0 = readCString(header, 0, 100)
                 val size = readOctal(header, 124, 12)
                 val type = header[156].toInt().toChar()
                 val prefix = readCString(header, 345, 155)
                 val fullName = if (prefix.isNotEmpty()) "$prefix/$name0" else name0
                 val pad = ((BLOCK - (size % BLOCK)) % BLOCK).toInt()
+
                 when (type) {
                     'L' -> {
                         val data = readFully(ins, size.toInt())
@@ -87,6 +104,7 @@ object BackupArchive {
             }
         }
     }
+
     fun readFully(ins: InputStream, n: Int): ByteArray? {
         if (n <= 0) return ByteArray(0)
         val out = ByteArray(n)
@@ -98,6 +116,7 @@ object BackupArchive {
         }
         return out
     }
+
     fun skipFully(ins: InputStream, n: Long) {
         var left = n
         val tmp = ByteArray(8192)
@@ -107,12 +126,14 @@ object BackupArchive {
             left -= r
         }
     }
+
     private fun readCString(b: ByteArray, off: Int, len: Int): String {
         var end = off
         val max = minOf(off + len, b.size)
         while (end < max && b[end] != 0.toByte()) end++
         return String(b, off, end - off, Charsets.UTF_8)
     }
+
     private fun readOctal(b: ByteArray, off: Int, len: Int): Long {
         var v = 0L
         var i = off
@@ -126,12 +147,23 @@ object BackupArchive {
         }
         return v
     }
+
+    
     fun sniffExtension(head: ByteArray): String = when {
         head.size >= 3 && head[0] == 0xFF.toByte() && head[1] == 0xD8.toByte() -> "jpg"
         head.size >= 8 && head[0] == 0x89.toByte() && head[1] == 'P'.code.toByte() -> "png"
         head.size >= 4 && head[0] == 'G'.code.toByte() && head[1] == 'I'.code.toByte() -> "gif"
+        head.size >= 8 && head[4] == 'f'.code.toByte() && head[5] == 't'.code.toByte() &&
+            head[6] == 'y'.code.toByte() && head[7] == 'p'.code.toByte() -> "m4a"
+        head.size >= 4 && head[0] == '#'.code.toByte() && head[1] == '!'.code.toByte() -> "amr"
+        head.size >= 3 && head[0] == 'I'.code.toByte() && head[1] == 'D'.code.toByte() &&
+            head[2] == '3'.code.toByte() -> "mp3"
+        head.size >= 2 && head[0] == 0xFF.toByte() && head[1] == 0xFB.toByte() -> "mp3"
+        head.size >= 4 && head[0] == 'R'.code.toByte() && head[1] == 'I'.code.toByte() -> "wav"
+        head.size >= 4 && head[0] == 'O'.code.toByte() && head[1] == 'g'.code.toByte() -> "ogg"
         else -> "jpg"
     }
+
     fun isZip(file: File): Boolean = runCatching {
         ZipFile(file).use { it.entries().hasMoreElements() }
     }.getOrDefault(false)

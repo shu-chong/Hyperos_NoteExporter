@@ -1,15 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  小米笔记的图标是「橙色方块 + 横线 + 一支铅笔」。
-  这里保留方块与横线，把铅笔换成向下的箭头，表示「导出」。
--->
+
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 纸张横线 -->
+    
     <path
         android:pathData="M24,30 L84,30"
         android:strokeColor="#73CE8520"
@@ -31,7 +28,7 @@
         android:strokeWidth="3.4"
         android:strokeLineCap="round" />
 
-    <!-- 向下箭头：竖杆 + 箭头 -->
+    
     <path
         android:pathData="M54,24 L54,58"
         android:strokeColor="#FFF8E7"

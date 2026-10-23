@@ -1,6 +1,10 @@
 package com.shu.notebackupexporter.core
+
+
 internal class ProtoReader(private val buf: ByteArray, private var pos: Int = 0) {
+
     val hasMore: Boolean get() = pos < buf.size
+
     fun readVarint(): Long {
         var result = 0L
         var shift = 0
@@ -13,12 +17,15 @@ internal class ProtoReader(private val buf: ByteArray, private var pos: Int = 0)
             require(shift <= 63) { "protobuf varint 过长" }
         }
     }
+
     fun readLengthDelimited(): ByteArray {
         val len = readVarint().toInt()
         require(len >= 0 && pos + len <= buf.size) { "protobuf 长度越界: $len" }
         return buf.copyOfRange(pos, pos + len).also { pos += len }
     }
+
     fun readString(): String = readLengthDelimited().toString(Charsets.UTF_8)
+
     fun skip(wire: Int) {
         when (wire) {
             0 -> readVarint()
@@ -29,6 +36,8 @@ internal class ProtoReader(private val buf: ByteArray, private var pos: Int = 0)
         }
     }
 }
+
+
 internal inline fun forEachField(
     buf: ByteArray,
     action: (field: Int, wire: Int, reader: ProtoReader) -> Unit,
