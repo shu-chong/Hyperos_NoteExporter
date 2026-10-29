@@ -5,7 +5,20 @@ import java.io.File
 
 object NoteRenderer {
 
-    private val IMG_MD = Regex("""!\[[^\]]*]\(\s*https://com\.miui\.notes/image/([0-9a-fA-F]{40})[^)]*\)""")
+    /**
+     * 旧版（及小米「摘录/收藏」类笔记）的图片引用：Markdown 的
+     * `![](https://com.miui.notes/image/<文件名>?size=full)`。
+     * 早期的备份图片文件名是 40 位 sha1（无扩展名）；HyperOS 3.x 的摘录/收藏笔记
+     * 则是 `img_<时间戳>_<序号>.jpeg` 这类带扩展名的文件名。两种都必须按「/image/ 之后、
+     * 直到 ? 或 ) 为止」的完整文件名去匹配，否则像 `img_xxx.jpeg` 这种会被整段漏掉。
+     */
+    private val IMG_MD = Regex("""!\[[^\]]*]\(\s*https://com\.miui\.notes/image/([^)\s?#]+)[^)]*\)""")
+    /**
+     * 新版（HyperOS 3.x）普通笔记的图片占位语法：一个非 ASCII 占位符（实测为 U+2600 ☀）
+     * 紧跟 40 位 sha1，再以 `<0/></>` 标签收尾，例如「☀ 00c8ce6f…<0/></>」。
+     * 占位符里的 sha1 即附件文件名（无扩展名）。
+     */
+    private val IMG_PLACEHOLDER = Regex("""[^\x00-\x7f]\s*([0-9a-fA-F]{40})(?:\s*<0/></>)?""")
     
     private val AUDIO_MD = Regex("""<??!?\[[^\]]*]\(\s*https://com\.miui\.notes/audio/([0-9A-Za-z._-]+)\s*\)>?""")
     private val ESCAPE = Regex("""\\([!-/:-@\[-`{-~])""")
@@ -26,12 +39,24 @@ object NoteRenderer {
     
     fun plainText(raw: String): String =
         WS.replace(
-            mdUnescape(AUDIO_MD.replace(IMG_MD.replace(raw, " "), " ")).replace('\u2062', ' '),
+            mdUnescape(
+                AUDIO_MD.replace(
+                    IMG_MD.replace(IMG_PLACEHOLDER.replace(raw, " "), " "),
+                    " ",
+                )
+            ).replace('\u2062', ' '),
             " ",
         ).trim()
 
-    fun imageIds(raw: String): List<String> =
-        IMG_MD.findAll(raw).map { it.groupValues[1].lowercase() }.sorted().toList()
+    /**
+     * 笔记里引用到的全部图片：Markdown 形式取「/image/ 后的完整文件名」（大小写敏感，
+     * 直接对应附件文件）；☀ 占位形式取 40 位 sha1（统一转小写，对应无扩展名的附件文件）。
+     */
+    fun imageIds(raw: String): List<String> {
+        val md = IMG_MD.findAll(raw).map { it.groupValues[1] }
+        val ph = IMG_PLACEHOLDER.findAll(raw).map { it.groupValues[1].lowercase() }
+        return (md + ph).distinct().sorted().toList()
+    }
 
     
     fun audioRefs(raw: String): List<String> =
@@ -57,7 +82,7 @@ object NoteRenderer {
 
     sealed interface Seg {
         data class Text(val text: String) : Seg
-        data class Image(val sha1: String) : Seg
+        data class Image(val ref: String) : Seg
         data class Audio(val fileName: String) : Seg
     }
 
@@ -65,6 +90,9 @@ object NoteRenderer {
     fun segments(raw: String): List<Seg> {
         val matches = ArrayList<Pair<IntRange, Seg>>()
         IMG_MD.findAll(raw).forEach { m ->
+            matches += m.range to Seg.Image(m.groupValues[1])
+        }
+        IMG_PLACEHOLDER.findAll(raw).forEach { m ->
             matches += m.range to Seg.Image(m.groupValues[1].lowercase())
         }
         AUDIO_MD.findAll(raw).forEach { m ->
@@ -101,12 +129,12 @@ object NoteRenderer {
             when (seg) {
                 is Seg.Image -> {
                     flushGroup()
-                    val f = File(attDir, seg.sha1)
+                    val f = File(attDir, seg.ref)
                     if (doc.addImage(f)) {
                         images++
                         wrote = true
                     } else {
-                        doc.addParagraph("[图片缺失 ${seg.sha1.take(12)}…]")
+                        doc.addParagraph("[图片缺失 ${seg.ref.take(12)}…]")
                         wrote = true
                     }
                 }
