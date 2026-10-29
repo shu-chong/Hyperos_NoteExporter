@@ -5,19 +5,7 @@ import java.io.File
 
 object NoteRenderer {
 
-    /**
-     * 旧版（及小米「摘录/收藏」类笔记）的图片引用：Markdown 的
-     * `![](https://com.miui.notes/image/<文件名>?size=full)`。
-     * 早期的备份图片文件名是 40 位 sha1（无扩展名）；HyperOS 3.x 的摘录/收藏笔记
-     * 则是 `img_<时间戳>_<序号>.jpeg` 这类带扩展名的文件名。两种都必须按「/image/ 之后、
-     * 直到 ? 或 ) 为止」的完整文件名去匹配，否则像 `img_xxx.jpeg` 这种会被整段漏掉。
-     */
     private val IMG_MD = Regex("""!\[[^\]]*]\(\s*https://com\.miui\.notes/image/([^)\s?#]+)[^)]*\)""")
-    /**
-     * 新版（HyperOS 3.x）普通笔记的图片占位语法：一个非 ASCII 占位符（实测为 U+2600 ☀）
-     * 紧跟 40 位 sha1，再以 `<0/></>` 标签收尾，例如「☀ 00c8ce6f…<0/></>」。
-     * 占位符里的 sha1 即附件文件名（无扩展名）。
-     */
     private val IMG_PLACEHOLDER = Regex("""[^\x00-\x7f]\s*([0-9a-fA-F]{40})(?:\s*<0/></>)?""")
     
     private val AUDIO_MD = Regex("""<??!?\[[^\]]*]\(\s*https://com\.miui\.notes/audio/([0-9A-Za-z._-]+)\s*\)>?""")
@@ -48,10 +36,6 @@ object NoteRenderer {
             " ",
         ).trim()
 
-    /**
-     * 笔记里引用到的全部图片：Markdown 形式取「/image/ 后的完整文件名」（大小写敏感，
-     * 直接对应附件文件）；☀ 占位形式取 40 位 sha1（统一转小写，对应无扩展名的附件文件）。
-     */
     fun imageIds(raw: String): List<String> {
         val md = IMG_MD.findAll(raw).map { it.groupValues[1] }
         val ph = IMG_PLACEHOLDER.findAll(raw).map { it.groupValues[1].lowercase() }

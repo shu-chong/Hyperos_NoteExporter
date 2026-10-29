@@ -301,25 +301,32 @@ class PdfWriter(private val target: File) : NoteDoc {
             sample *= 2
         }
         val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        val bmp: Bitmap = BitmapFactory.decodeFile(file.absolutePath, opts) ?: return false
+        val src: Bitmap = BitmapFactory.decodeFile(file.absolutePath, opts) ?: return false
 
         try {
             var w = CONTENT_W
-            var h = bmp.height * (w / bmp.width)
+            var h = src.height * (w / src.width)
             val maxH = (PAGE_H - MARGIN * 2) * 0.88f
             if (h > maxH) {
                 h = maxH
-                w = bmp.width * (h / bmp.height)
+                w = src.width * (h / src.height)
             }
-            ensurePage()
-            if (y + h > PAGE_H - MARGIN) newPage()
-            advance(6f)
-            canvas?.drawBitmap(bmp, MARGIN + (CONTENT_W - w) / 2f, y, null)
-            y += h + 8f
-            imageCount++
-            return true
+            val tw = (w + 0.5f).toInt().coerceAtLeast(1)
+            val th = (h + 0.5f).toInt().coerceAtLeast(1)
+            val bmp = Bitmap.createScaledBitmap(src, tw, th, true)
+            try {
+                ensurePage()
+                if (y + h > PAGE_H - MARGIN) newPage()
+                advance(6f)
+                canvas?.drawBitmap(bmp, MARGIN + (CONTENT_W - w) / 2f, y, null)
+                y += h + 8f
+                imageCount++
+                return true
+            } finally {
+                bmp.recycle()
+            }
         } finally {
-            bmp.recycle()
+            src.recycle()
         }
     }
 
